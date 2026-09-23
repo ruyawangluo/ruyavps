@@ -8,7 +8,6 @@ require dirname(__DIR__) . '/app/bootstrap.php';
 
 use App\Core\Http;
 use App\Core\Router;
-use App\Controllers\DeployController;
 use App\Controllers\OpenApiController;
 use App\Controllers\InstanceApiController;
 use App\Controllers\Admin\AuthController as AdminAuth;
@@ -26,11 +25,6 @@ use App\Controllers\Client\DashboardController as ClientDashboard;
 use App\Controllers\Client\InstanceController as ClientInstance;
 
 $router = new Router();
-
-// ---- 分发：节点端安装脚本 / 程序包 / 节点运维工具（无需鉴权） ----
-$router->get('/deploy/agent.sh',  [DeployController::class, 'agentScript']);
-$router->get('/deploy/agent.tar', [DeployController::class, 'agentPackage']);
-$router->get('/deploy/tools/{name}', [DeployController::class, 'tool']);
 
 // ---- 开放 API（供上层财务/前台） ----
 foreach ([
@@ -59,8 +53,6 @@ $router->get('/admin', [DashboardController::class, 'index']);
 $router->get('/admin/nodes',              [NodeController::class, 'index']);
 $router->post('/admin/nodes',             [NodeController::class, 'store']);
 $router->get('/admin/nodes/create',       [NodeController::class, 'create']);
-$router->get('/admin/nodes/ssh',          [NodeController::class, 'sshForm']);
-$router->post('/admin/nodes/ssh',         [NodeController::class, 'sshInstall']);
 $router->get('/admin/nodes/{id}/edit',    [NodeController::class, 'edit']);
 $router->post('/admin/nodes/{id}',        [NodeController::class, 'update']);
 $router->post('/admin/nodes/{id}/delete', [NodeController::class, 'destroy']);

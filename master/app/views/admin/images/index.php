@@ -12,7 +12,7 @@
 <?php if ($warning): ?><div class="alert info"><?= e($warning) ?></div><?php endif; ?>
 
 <?php if (!$images): ?>
-  <div class="card"><div class="card-body empty">该节点暂无镜像。可在节点上执行 <code>/deploy/tools/incus-image.sh</code> 导入。</div></div>
+  <div class="card"><div class="card-body empty">该节点暂无镜像。可在节点上执行 <code>scripts/incus-image.sh（从 GitHub 拉取）</code> 导入。</div></div>
 <?php else: ?>
 <div class="tiles">
   <?php foreach ($images as $im): ?>

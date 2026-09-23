@@ -1,41 +1,41 @@
 <?php
 /** @var array $nodes */
-$installCmd = \App\Controllers\DeployController::nodeInstallCommand();
-$incusTools = [
-    ['incus-manage', '安装 / 卸载 Incus（含网桥与默认 profile）'],
-    ['incus-storage', '创建 / 删除 / 列出存储池（ZFS / Btrfs）'],
-    ['incus-image', '下载并导入 LXC / VM 镜像到本地'],
-];
 ?>
 <div class="between mb-2">
   <h2 style="margin:0">计算节点</h2>
-  <div class="flex">
-    <a class="btn ghost" href="/admin/nodes/ssh">SSH 安装节点</a>
-    <a class="btn" href="/admin/nodes/create">接入节点</a>
-  </div>
+  <a class="btn" href="/admin/nodes/create">接入节点</a>
 </div>
 
 <details class="card">
-  <summary style="padding:16px 20px;cursor:pointer;font-weight:700">节点准备：安装命令与 Incus 工具（在节点上手动执行）</summary>
+  <summary style="padding:16px 20px;cursor:pointer;font-weight:700">节点准备：从 GitHub 安装（在节点上以 root 执行）</summary>
   <div class="card-body" style="border-top:1px solid var(--line-2)">
     <div class="form-row">
       <label>① 安装节点端程序（被控程序 + 本地库 + 本地 API）</label>
       <div class="flex">
-        <input type="text" readonly class="mono" id="node-install-cmd" value="<?= e($installCmd) ?>">
+        <input type="text" readonly class="mono" id="node-install-cmd" value="<?= e(one_liner(github_raw('install/agent-install.sh'))) ?>">
         <button type="button" class="btn sm ghost" onclick="navigator.clipboard.writeText(document.getElementById('node-install-cmd').value)">复制</button>
       </div>
-      <div class="form-hint">执行完成后会打印节点的 <b>IP / 端口 / KEY</b>，用「接入节点」填入即可。</div>
+      <div class="form-hint">执行完成后会打印节点的 <b>IP / 端口 / KEY</b>，用右上角「接入节点」填入即可。</div>
     </div>
     <div class="form-row">
       <label>② Incus 单独配置（安装 / 存储池 / 镜像）</label>
-      <?php foreach ($incusTools as [$tool, $desc]): ?>
+      <?php
+      $tools = [
+          ['scripts/incus-manage.sh',  '安装 / 卸载 Incus（含网桥与默认 profile）'],
+          ['scripts/incus-storage.sh', '创建 / 删除 / 列出存储池（ZFS / Btrfs）'],
+          ['scripts/incus-image.sh',   '下载并导入 LXC / VM 镜像到本地'],
+      ];
+      foreach ($tools as [$path, $desc]):
+          $cmd = one_liner(github_raw($path));
+      ?>
         <div class="flex" style="margin-bottom:6px">
-          <input type="text" readonly class="mono" id="tool-<?= e($tool) ?>" value="<?= e(\App\Controllers\DeployController::toolCommand($tool)) ?>">
-          <button type="button" class="btn sm ghost" onclick="navigator.clipboard.writeText(document.getElementById('tool-<?= e($tool) ?>').value)">复制</button>
+          <input type="text" readonly class="mono" id="tool-<?= e(basename($path, '.sh')) ?>" value="<?= e($cmd) ?>">
+          <button type="button" class="btn sm ghost" onclick="navigator.clipboard.writeText(document.getElementById('tool-<?= e(basename($path, '.sh')) ?>').value)">复制</button>
         </div>
         <div class="form-hint" style="margin-bottom:8px"><?= e($desc) ?></div>
       <?php endforeach; ?>
     </div>
+    <div class="form-hint">命令从 GitHub 拉取：<code class="mono"><?= e(github_raw()) ?></code>（可在 master 配置中改 <code>github_raw</code>）。</div>
   </div>
 </details>
 

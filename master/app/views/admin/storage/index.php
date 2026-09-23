@@ -11,7 +11,7 @@
 </div>
 
 <?php if (!$pools): ?>
-  <div class="card"><div class="card-body empty">该节点暂无存储池。可在节点上执行 <code>/deploy/tools/incus-storage.sh</code> 创建。</div></div>
+  <div class="card"><div class="card-body empty">该节点暂无存储池。可在节点上执行 <code>scripts/incus-storage.sh（从 GitHub 拉取）</code> 创建。</div></div>
 <?php else: ?>
 <div class="tiles">
   <?php foreach ($pools as $p): ?>

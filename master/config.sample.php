@@ -35,4 +35,8 @@ return [
 
     // 默认分页大小
     'page_size' => 20,
+
+    // GitHub 仓库（节点端安装脚本 / Incus 工具脚本从这里拉取）
+    'github_raw'     => 'https://raw.githubusercontent.com/ruyawangluo/ruyavps/main',
+    'github_archive' => 'https://github.com/ruyawangluo/ruyavps/archive/refs/heads/main.tar.gz',
 ];

@@ -109,3 +109,21 @@ if (!function_exists('user_url')) {
         return '/user' . ($path !== '' ? '/' . ltrim($path, '/') : '');
     }
 }
+
+if (!function_exists('github_raw')) {
+    /** 拼出仓库内某文件的 GitHub Raw 地址（在节点上 curl 用）。 */
+    function github_raw(string $path = ''): string
+    {
+        $base = rtrim((string)config('github_raw', 'https://raw.githubusercontent.com/ruyawangluo/ruyavps/main'), '/');
+        return $base . ($path !== '' ? '/' . ltrim($path, '/') : '');
+    }
+}
+
+if (!function_exists('one_liner')) {
+    /** 生成「下载到临时文件再执行」的一行命令（交互式脚本适用）。 */
+    function one_liner(string $url): string
+    {
+        $name = basename(parse_url($url, PHP_URL_PATH) ?: 'script.sh');
+        return sprintf('curl -fsSL %s -o /tmp/%s && sudo bash /tmp/%s', $url, $name, $name);
+    }
+}

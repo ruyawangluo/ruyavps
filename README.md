@@ -28,46 +28,44 @@
 
 ## 部署顺序
 
-### 1. 面板端（1Panel：OpenResty + MySQL + PHP）
+### 1. 面板端（仅适配 1Panel：OpenResty + MySQL + PHP 8）
 
-1. 1Panel 新建站点，运行目录指向 `master/public`，PHP 8.1+（需 `pdo_mysql/openssl/mbstring/curl`）。
-2. 站点「伪静态」只填：
-   ```nginx
-   location / {
-       try_files $uri $uri/ /index.php?$query_string;
-   }
-   ```
-3. 部署代码：把 `master/` 目录内容放到站点根；同时把 `agent/` 复制为站点下的 `agent-src/`，把 `install/agent-install.sh` 复制为站点下的 `agent-install.sh`（供被控端远程安装分发）。
-4. 在服务器上运行安装脚本（会部署代码、建库导入、写 config.php、建管理员）：
-   ```bash
-   bash install/install-master.sh
-   ```
-   按提示填站点目录（默认 `/opt/1panel/www/sites/ruyavps/index`）、数据库、站点地址、管理员账号密码。
+前置（手动完成）：
+1. 安装 1Panel，在应用商店装 OpenResty、PHP 8+、MySQL。
+2. PHP 8 启用扩展：`pdo_mysql / mbstring / curl / openssl`。
+3. 新建站点，站点目录为 **`/opt/1panel/www/sites/csvps/index`**（代号 csvps）。
+4. 在 1Panel 建好 MySQL 数据库与用户（脚本不建库，只导入表结构）。
 
-### 2. 节点端（在每台计算节点上，root）
-
-在面板「计算节点」页复制 **节点安装命令** 执行（无需参数）：
+然后在服务器上以 root 运行安装脚本（自动从 GitHub 下载程序包 → 解压到站点目录 → 对接数据库并导入结构 → 写 config.php → 建管理员）：
 
 ```bash
-curl -fsSL http://<面板地址>/deploy/agent.sh | sudo bash
+curl -fsSL https://raw.githubusercontent.com/ruyawangluo/ruyavps/main/install/install-master.sh -o /tmp/install-master.sh && sudo bash /tmp/install-master.sh
 ```
 
-完成后会打印：
+按提示填写：数据库主机/端口/库名/用户/密码、站点地址、管理员账号密码。完成后脚本会提示你去 1Panel 把该站点「运行目录」改为 **`/public`**、伪静态填 `try_files`，然后访问站点即可。
+
+> 升级：`sudo bash install-master.sh update`（重新拉取并覆盖程序，保留 config.php）。
+
+### 2. 节点端（在每台计算节点上，root；从 GitHub 直接安装）
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/ruyawangluo/ruyavps/main/install/agent-install.sh -o /tmp/agent-install.sh && sudo bash /tmp/agent-install.sh
+```
+
+完成后会打印节点的接入信息：
 
 ```
- 节点接入信息（填入面板端「计算节点」）：
+ 节点端安装完成 —— 拿去面板端「计算节点 → 接入节点」对接：
    IP   : 1.2.3.4
    端口 : 8787
    KEY  : <随机 key>
 ```
 
-在面板「计算节点 → 接入节点」填入 IP / 端口 / KEY 即完成接入。
+在面板「计算节点 → 接入节点」填入 IP / 端口 / KEY 即完成对接。
 
-> 也可用「计算节点 → SSH 安装节点」由面板登录目标机自动安装并解析接入信息。
+> 节点端不需要面板地址、不需要数据库（自带本地 SQLite）。
 
-### 3. Incus 单独配置（在节点上）
-
-面板「计算节点」页提供三个脚本的一键命令（也可访问 `/deploy/tools/<名称>.sh`）：
+### 3. Incus 单独配置（在节点上，从 GitHub 拉取）
 
 | 脚本 | 作用 |
 |------|------|
@@ -84,19 +82,22 @@ curl -fsSL http://<面板地址>/deploy/agent.sh | sudo bash
 ```
 .
 ├── install/
-│   ├── install-master.sh       # 面板端安装/升级脚本（1Panel）
+│   ├── install-master.sh       # 面板端安装/升级脚本（从 GitHub 拉取程序包）
+│   ├── agent-install.sh        # 节点端安装脚本（从 GitHub 拉取）
 │   ├── schema.sql              # 面板数据库结构
-│   ├── agent-install.sh        # 节点端安装脚本（由 /deploy/agent.sh 下发）
 │   └── nginx.conf.sample
+├── scripts/                    # 节点运维脚本（从 GitHub 拉取）
+│   ├── incus-manage.sh         # 安装/卸载 Incus
+│   ├── incus-storage.sh        # 存储池
+│   └── incus-image.sh          # 镜像导入
 ├── master/                     # 面板端
 │   ├── config.sample.php
 │   ├── public/                 # Web 根目录（index.php / router.php / assets）
 │   ├── app/
-│   │   ├── Core/               # Db/NodeClient/NodeStore…/OpenAuth/InstanceAuth/Setting/Tar/Version
+│   │   ├── Core/               # Db/NodeClient/NodeApi…/OpenAuth/InstanceAuth/Setting/Tar/Version
 │   │   ├── Services/           # NodeService（节点注册表）/ InstanceService（索引+转发）
-│   │   ├── Controllers/        # Admin\* / Client\* / OpenApiController / InstanceApiController / DeployController / InstallController
+│   │   ├── Controllers/        # Admin\* / Client\* / OpenApiController / InstanceApiController
 │   │   └── views/
-│   ├── resources/              # incus-manage.sh / incus-storage.sh / incus-image.sh
 │   └── bin/cron.php            # 可选：定时刷新节点/实例状态
 └── agent/                      # 节点端（被控程序 + 本地库 + 本地 API）
     ├── config.sample.php
@@ -116,7 +117,7 @@ curl -fsSL http://<面板地址>/deploy/agent.sh | sudo bash
 | 模块 | 说明 |
 |------|------|
 | 控制台 | 容器/虚拟机数量、运行中、节点在线数；最近实例与操作 |
-| 计算节点 | 接入/编辑/测试/启停/移除；仅保存 `ip/端口/key`；SSH 安装；节点安装命令与 Incus 工具命令 |
+| 计算节点 | 接入/编辑/测试/启停/移除；仅保存 `ip/端口/key`；节点安装与 Incus 工具命令（GitHub 拉取） |
 | 云服务器 | 开通、详情（含节点实时状态/用量/事件）、开机/关机/重启、重置密码、调整规格、带宽/IO/CPU 上限、快照、执行命令、删除、每机访问 Key |
 | 镜像 | 按节点查看该节点 Incus 镜像（只读） |
 | 存储池 | 按节点查看该节点存储池（只读） |
