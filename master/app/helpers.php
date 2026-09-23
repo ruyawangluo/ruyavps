@@ -127,3 +127,19 @@ if (!function_exists('one_liner')) {
         return sprintf('curl -fsSL %s -o /tmp/%s && sudo bash /tmp/%s', $url, $name, $name);
     }
 }
+
+// mbstring 缺失时的最小回退（面板优先用 mbstring，缺失也能跑）
+if (!function_exists('mb_substr')) {
+    function mb_substr($string, $start, $length = null, $encoding = null)
+    {
+        return $length === null ? substr((string)$string, $start) : substr((string)$string, $start, $length);
+    }
+}
+if (!function_exists('mb_strimwidth')) {
+    function mb_strimwidth($string, $start, $width, $trimmarker = '', $encoding = null)
+    {
+        $string = (string)$string;
+        $out = substr($string, $start, $width);
+        return strlen($string) > ($start + $width) ? $out . $trimmarker : $out;
+    }
+}

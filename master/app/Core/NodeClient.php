@@ -20,26 +20,50 @@ class NodeClient
 
     private function request(string $method, string $path, ?array $body = null): array
     {
-        $ch = curl_init($this->base . $path);
+        $url = $this->base . $path;
+        $payload = $body !== null ? json_encode($body, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) : null;
         $headers = ['X-Node-Token: ' . $this->key, 'Content-Type: application/json'];
-        curl_setopt_array($ch, [
-            CURLOPT_RETURNTRANSFER => true,
-            CURLOPT_CUSTOMREQUEST  => $method,
-            CURLOPT_TIMEOUT        => $this->timeout,
-            CURLOPT_CONNECTTIMEOUT => 5,
-            CURLOPT_HTTPHEADER     => $headers,
-        ]);
-        if ($body !== null) {
-            curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode($body, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES));
-        }
-        $resp = curl_exec($ch);
-        $err = curl_error($ch);
-        $status = (int)curl_getinfo($ch, CURLINFO_HTTP_CODE);
-        curl_close($ch);
 
-        if ($resp === false) {
-            return ['ok' => false, 'status' => 0, 'data' => null, 'error' => '连接失败: ' . $err];
+        if (function_exists('curl_init')) {
+            $ch = curl_init($url);
+            curl_setopt_array($ch, [
+                CURLOPT_RETURNTRANSFER => true,
+                CURLOPT_CUSTOMREQUEST  => $method,
+                CURLOPT_TIMEOUT        => $this->timeout,
+                CURLOPT_CONNECTTIMEOUT => 5,
+                CURLOPT_HTTPHEADER     => $headers,
+            ]);
+            if ($payload !== null) {
+                curl_setopt($ch, CURLOPT_POSTFIELDS, $payload);
+            }
+            $resp = curl_exec($ch);
+            $err = curl_error($ch);
+            $status = (int)curl_getinfo($ch, CURLINFO_HTTP_CODE);
+            curl_close($ch);
+            if ($resp === false) {
+                return ['ok' => false, 'status' => 0, 'data' => null, 'error' => '连接失败: ' . $err];
+            }
+        } else {
+            // 没有 curl 扩展时用 stream 回退（PHP 默认自带）
+            $ctx = stream_context_create(['http' => [
+                'method'        => $method,
+                'timeout'       => $this->timeout,
+                'ignore_errors' => true,
+                'header'        => implode("\r\n", $headers),
+                'content'       => $payload ?? '',
+            ]]);
+            $resp = @file_get_contents($url, false, $ctx);
+            $status = 0;
+            foreach ($http_response_header ?? [] as $h) {
+                if (preg_match('#^HTTP/\S+\s+(\d+)#', $h, $m)) {
+                    $status = (int)$m[1];
+                }
+            }
+            if ($resp === false) {
+                return ['ok' => false, 'status' => $status, 'data' => null, 'error' => '连接失败（http 请求失败）'];
+            }
         }
+
         $decoded = json_decode((string)$resp, true);
         if (!is_array($decoded)) {
             return ['ok' => false, 'status' => $status, 'data' => null, 'error' => '响应解析失败: ' . substr((string)$resp, 0, 160)];

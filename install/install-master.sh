@@ -75,10 +75,17 @@ fi
 PHP_VER="$("${PHP_EXEC[@]}" -r 'echo PHP_VERSION;' 2>/dev/null || true)"
 [ -n "$PHP_VER" ] || { err "无法执行 php（容器内未找到 php 命令）。"; exit 1; }
 "${PHP_EXEC[@]}" -r 'exit(version_compare(PHP_VERSION, "8.1.0", ">=") ? 0 : 1);' || { err "PHP 版本过低（${PHP_VER}），需 8.1+。"; exit 1; }
-for ext in pdo_mysql mbstring curl openssl; do
-  "${PHP_EXEC[@]}" -m 2>/dev/null | grep -qi "^${ext}$" || { err "PHP 缺少扩展：${ext}（请在 1Panel 的 PHP 设置中安装）。"; exit 1; }
+ok "PHP ${PHP_VER} OK"
+
+# 必需扩展
+for ext in pdo_mysql; do
+  "${PHP_EXEC[@]}" -m 2>/dev/null | grep -qi "^${ext}$" || { err "PHP 缺少必需扩展：${ext}（请在 1Panel 的 PHP 设置中安装）。"; exit 1; }
 done
-ok "PHP ${PHP_VER} 及扩展 OK"
+# 可选扩展（缺失仅提示，面板已做回退）
+for ext in curl mbstring openssl; do
+  "${PHP_EXEC[@]}" -m 2>/dev/null | grep -qi "^${ext}$" || warn "PHP 未启用扩展：${ext}（可忽略；建议在 1Panel 里启用 curl 以获得更好的节点通信）"
+done
+ok "PHP 扩展检查完成"
 [ -d /opt/1panel ] && ok "检测到 1Panel" || warn "未检测到 /opt/1panel（本脚本仅适配 1Panel）"
 
 # ---------------------------------------------------------------------------
