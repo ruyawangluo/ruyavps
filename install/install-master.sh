@@ -10,7 +10,7 @@
 #     1) 已安装 1Panel，并在「应用商店」安装：OpenResty、PHP 8+、MySQL
 #     2) PHP 8 已启用扩展：pdo_mysql、mbstring、curl、openssl
 #     3) 已在 1Panel 新建站点，且站点目录为：
-#          /opt/1panel/www/sites/csvps/index        （本站固定目录，代号 csvps）
+#          /opt/1panel/www/sites/ruyavps/index        （本站固定目录，代号 ruyavps）
 #     4) 已在 1Panel 建好 MySQL 数据库与账号（本脚本只导入表结构，不建库）
 #     5) 用 root（sudo）执行
 #
@@ -23,7 +23,7 @@
 set -euo pipefail
 
 MODE="${1:-install}"
-SITE_DIR="/opt/1panel/www/sites/csvps/index"          # 固定目录（仅适配 1Panel）
+SITE_DIR="/opt/1panel/www/sites/ruyavps/index"          # 固定目录（仅适配 1Panel）
 REPO_ARCHIVE="${REPO_ARCHIVE:-https://github.com/ruyawangluo/ruyavps/archive/refs/heads/main.tar.gz}"
 
 DB_HOST="${DB_HOST:-127.0.0.1}"

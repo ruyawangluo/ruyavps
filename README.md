@@ -33,7 +33,7 @@
 前置（手动完成）：
 1. 安装 1Panel，在应用商店装 OpenResty、PHP 8+、MySQL。
 2. PHP 8 启用扩展：`pdo_mysql / mbstring / curl / openssl`。
-3. 新建站点，站点目录为 **`/opt/1panel/www/sites/csvps/index`**（代号 csvps）。
+3. 新建站点，站点目录为 **`/opt/1panel/www/sites/ruyavps/index`**（代号 ruyavps）。
 4. 在 1Panel 建好 MySQL 数据库与用户（脚本不建库，只导入表结构）。
 
 然后在服务器上以 root 运行安装脚本（自动从 GitHub 下载程序包 → 解压到站点目录 → 对接数据库并导入结构 → 写 config.php → 建管理员）：
