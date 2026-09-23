@@ -77,15 +77,12 @@ PHP_VER="$("${PHP_EXEC[@]}" -r 'echo PHP_VERSION;' 2>/dev/null || true)"
 "${PHP_EXEC[@]}" -r 'exit(version_compare(PHP_VERSION, "8.1.0", ">=") ? 0 : 1);' || { err "PHP 版本过低（${PHP_VER}），需 8.1+。"; exit 1; }
 ok "PHP ${PHP_VER} OK"
 
-# 必需扩展
-for ext in pdo_mysql; do
-  "${PHP_EXEC[@]}" -m 2>/dev/null | grep -qi "^${ext}$" || { err "PHP 缺少必需扩展：${ext}（请在 1Panel 的 PHP 设置中安装）。"; exit 1; }
+# 扩展检查（仅提示，不阻断）：注意 CLI 与 php-fpm 的扩展启用可能不同，
+# 面板实际跑在 php-fpm 下，所以这里缺失也不影响，仅提醒。
+for ext in pdo_mysql curl mbstring openssl; do
+  "${PHP_EXEC[@]}" -m 2>/dev/null | grep -qi "^${ext}$" || warn "检测到 PHP(CLI) 未列出扩展：${ext}（若面板运行异常，请在 1Panel 的 PHP 设置里启用；面板已对 curl/mbstring 做回退）"
 done
-# 可选扩展（缺失仅提示，面板已做回退）
-for ext in curl mbstring openssl; do
-  "${PHP_EXEC[@]}" -m 2>/dev/null | grep -qi "^${ext}$" || warn "PHP 未启用扩展：${ext}（可忽略；建议在 1Panel 里启用 curl 以获得更好的节点通信）"
-done
-ok "PHP 扩展检查完成"
+ok "扩展检查完成（仅提示）"
 [ -d /opt/1panel ] && ok "检测到 1Panel" || warn "未检测到 /opt/1panel（本脚本仅适配 1Panel）"
 
 # ---------------------------------------------------------------------------

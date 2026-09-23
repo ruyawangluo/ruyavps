@@ -13,7 +13,7 @@ namespace App\Core;
 class Version
 {
     /** 面板端版本 */
-    public const MASTER = '2.2.3';
+    public const MASTER = '2.2.4';
 
     /** 节点端程序版本（仅供参考，实际以节点 lib/Version.php 为准） */
     public const MIN_AGENT = '2.0.0';
