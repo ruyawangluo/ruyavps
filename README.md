@@ -36,6 +36,8 @@
 3. 新建站点，站点目录为 **`/opt/1panel/www/sites/ruyavps/index`**（代号 ruyavps）。
 4. 在 1Panel 建好 MySQL 数据库与用户（脚本不建库，只导入表结构）。
 
+> 1Panel 的 PHP/MySQL 跑在 Docker 容器里，宿主机通常没有 php/mysql 命令；安装脚本会自动通过 `docker exec` 进入对应容器执行（无需宿主机装 php/mysql）。
+
 然后在服务器上以 root 运行安装脚本（自动从 GitHub 下载程序包 → 解压到站点目录 → 对接数据库并导入结构 → 写 config.php → 建管理员）：
 
 ```bash

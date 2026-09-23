@@ -2,31 +2,29 @@
 # ============================================================================
 #  Incus 云控制台 · 面板端安装 / 升级脚本（仅适配 1Panel）
 #
-#  用法（可直接从 GitHub 拉取执行，无需先把仓库放到服务器）：
+#  用法（可直接从 GitHub 拉取执行）：
 #     curl -fsSL https://raw.githubusercontent.com/ruyawangluo/ruyavps/main/install/install-master.sh -o /tmp/install-master.sh && sudo bash /tmp/install-master.sh
 #     sudo bash install-master.sh update      # 升级（覆盖程序，保留 config.php）
 #
-#  前置环境（本脚本不负责安装 Web 环境）：
-#     1) 已安装 1Panel，并在「应用商店」安装：OpenResty、PHP 8+、MySQL
-#     2) PHP 8 已启用扩展：pdo_mysql、mbstring、curl、openssl
-#     3) 已在 1Panel 新建站点，且站点目录为：
-#          /opt/1panel/www/sites/ruyavps/index        （本站固定目录，代号 ruyavps）
-#     4) 已在 1Panel 建好 MySQL 数据库与账号（本脚本只导入表结构，不建库）
-#     5) 用 root（sudo）执行
-#
-#  本脚本会：从 GitHub 下载程序包 → 解压到网站目录 → 对接已建好的数据库并导入结构
-#            → 写 config.php → 建管理员账号 → 提示你去 1Panel 改运行目录并访问站点。
+#  前置环境（手动完成，本脚本不装 Web 环境）：
+#     1) 已安装 1Panel，并在「应用商店」安装 OpenResty、PHP 8+、MySQL
+#        —— 注意 1Panel 的 PHP/MySQL 跑在 Docker 容器里，宿主机通常没有 php/mysql 命令，
+#           本脚本会自动通过 docker exec 进入对应容器执行（无需宿主机装 php/mysql）。
+#     2) 已在 1Panel 新建站点，站点目录固定为：
+#          /opt/1panel/www/sites/ruyavps/index
+#     3) 已在 1Panel 建好 MySQL 数据库与账号（本脚本只导入表结构，不建库）
+#     4) 用 root（sudo）执行
 #
 #  可用环境变量免交互：DB_HOST DB_PORT DB_NAME DB_USER DB_PASS SITE_URL ADMIN_USER ADMIN_PASS
-#                      REPO_ARCHIVE（默认 GitHub main 分支归档）
+#                      PHP_CT（php 容器名）MYSQL_CT（mysql 容器名）REPO_ARCHIVE
 # ============================================================================
 set -euo pipefail
 
 MODE="${1:-install}"
-SITE_DIR="/opt/1panel/www/sites/ruyavps/index"          # 固定目录（仅适配 1Panel）
+SITE_DIR="${SITE_DIR:-/opt/1panel/www/sites/ruyavps/index}"
 REPO_ARCHIVE="${REPO_ARCHIVE:-https://github.com/ruyawangluo/ruyavps/archive/refs/heads/main.tar.gz}"
 
-DB_HOST="${DB_HOST:-127.0.0.1}"
+DB_HOST="${DB_HOST:-}"
 DB_PORT="${DB_PORT:-3306}"
 DB_NAME="${DB_NAME:-}"
 DB_USER="${DB_USER:-}"
@@ -40,7 +38,7 @@ ok() { printf '\033[1;32m%s\033[0m\n' "$*"; }
 warn() { printf '\033[1;33m%s\033[0m\n' "$*"; }
 err() { printf '\033[1;31m%s\033[0m\n' "$*" >&2; }
 
-ask() { # ask VAR "提示" "默认值"
+ask() {
   local var="$1" prompt="$2" def="${3:-}" cur val
   cur="$(eval "echo \"\${$var:-}\"")"
   if [ -n "$cur" ]; then return; fi
@@ -49,25 +47,46 @@ ask() { # ask VAR "提示" "默认值"
 }
 
 [ "$(id -u)" = "0" ] || { err "请用 root 运行（sudo bash install-master.sh）"; exit 1; }
-[ "$MODE" = "uninstall" ] && { warn "卸载请自行删除 ${SITE_DIR} 并 drop 数据库。"; exit 0; }
+[ "${MODE}" = "uninstall" ] && { warn "卸载请自行删除 ${SITE_DIR} 并 drop 数据库。"; exit 0; }
+
+command -v curl >/dev/null 2>&1 || { err "缺少 curl。"; exit 1; }
 
 # ---------------------------------------------------------------------------
-c "==> 环境检查"
-command -v curl >/dev/null 2>&1 || { err "缺少 curl。"; exit 1; }
-command -v php  >/dev/null 2>&1 || { err "未找到 php，请先在 1Panel 安装 PHP 8+。"; exit 1; }
-command -v mysql>/dev/null 2>&1 || { err "未找到 mysql 客户端，请先安装 MySQL。"; exit 1; }
-PHP_VER="$(php -r 'echo PHP_VERSION;')"
-php -r 'exit(version_compare(PHP_VERSION, "8.1.0", ">=") ? 0 : 1);' || { err "PHP 版本过低（${PHP_VER}），需 8.1+。"; exit 1; }
+# 运行时探测：优先宿主机命令，否则用 1Panel 的 docker 容器
+c "==> 探测运行环境"
+PHP_EXEC=()
+if command -v php >/dev/null 2>&1; then
+  PHP_EXEC=(php); ok "使用宿主机 php"
+elif command -v docker >/dev/null 2>&1; then
+  PHP_CT="${PHP_CT:-$(docker ps --format '{{.Names}}' | grep -iE 'php' | head -1 || true)}"
+  [ -n "$PHP_CT" ] && PHP_EXEC=(docker exec "$PHP_CT" php) && ok "使用 1Panel PHP 容器：${PHP_CT}"
+fi
+[ "${#PHP_EXEC[@]}" -gt 0 ] || { err "未找到 php：宿主机无 php，也未发现 1Panel 的 PHP 容器。请在 1Panel 应用商店安装 PHP 8+。"; exit 1; }
+
+MYSQL_EXEC=()
+if command -v mysql >/dev/null 2>&1; then
+  MYSQL_EXEC=(mysql); ok "使用宿主机 mysql 客户端"
+elif command -v docker >/dev/null 2>&1; then
+  MYSQL_CT="${MYSQL_CT:-$(docker ps --format '{{.Names}}' | grep -iE 'mysql|mariadb' | head -1 || true)}"
+  [ -n "$MYSQL_CT" ] && MYSQL_EXEC=(docker exec -i "$MYSQL_CT" mysql) && ok "使用 1Panel MySQL 容器：${MYSQL_CT}"
+fi
+[ "${#MYSQL_EXEC[@]}" -gt 0 ] || { err "未找到 mysql：宿主机无 mysql 客户端，也未发现 1Panel 的 MySQL 容器。请先安装 MySQL。"; exit 1; }
+
+PHP_VER="$("${PHP_EXEC[@]}" -r 'echo PHP_VERSION;' 2>/dev/null || true)"
+[ -n "$PHP_VER" ] || { err "无法执行 php（容器内未找到 php 命令）。"; exit 1; }
+"${PHP_EXEC[@]}" -r 'exit(version_compare(PHP_VERSION, "8.1.0", ">=") ? 0 : 1);' || { err "PHP 版本过低（${PHP_VER}），需 8.1+。"; exit 1; }
 for ext in pdo_mysql mbstring curl openssl; do
-  php -m | grep -qi "^${ext}$" || { err "PHP 缺少扩展：${ext}（请在 1Panel 的 PHP 设置中安装）。"; exit 1; }
+  "${PHP_EXEC[@]}" -m 2>/dev/null | grep -qi "^${ext}$" || { err "PHP 缺少扩展：${ext}（请在 1Panel 的 PHP 设置中安装）。"; exit 1; }
 done
 ok "PHP ${PHP_VER} 及扩展 OK"
-[ -d /opt/1panel ] && ok "检测到 1Panel" || warn "未检测到 /opt/1panel（本脚本仅适配 1Panel，请确认站点目录）"
+[ -d /opt/1panel ] && ok "检测到 1Panel" || warn "未检测到 /opt/1panel（本脚本仅适配 1Panel）"
 
 # ---------------------------------------------------------------------------
 if [ "$MODE" = "install" ]; then
   c "==> 安装参数（回车使用默认/已设值；数据库请先在 1Panel 建好）"
-  ask DB_HOST    "数据库主机" "$DB_HOST"
+  # 若为 1Panel 容器部署，PHP 容器连 MySQL 一般用容器名（同网络可解析）
+  default_host="${MYSQL_CT:-127.0.0.1}"
+  ask DB_HOST    "数据库主机（1Panel 中 PHP 连 MySQL 通常填容器名 ${default_host}）" "$default_host"
   ask DB_PORT    "数据库端口" "$DB_PORT"
   ask DB_NAME    "数据库名（已在 1Panel 建好）"
   ask DB_USER    "数据库用户"
@@ -105,12 +124,16 @@ c "==> 对接数据库并导入结构"
 if [ -f "${SITE_DIR}/config.php" ]; then
   warn "已存在 config.php，跳过数据库初始化（如需重装请先删除它）。"
 else
-  mysql -h"$DB_HOST" -P"$DB_PORT" -u"$DB_USER" -p"$DB_PASS" "$DB_NAME" -e "SELECT 1;" >/dev/null 2>&1 \
-    || { err "数据库连接失败（库/用户/密码/主机）。请先在 1Panel 建好数据库与用户。"; exit 1; }
-  mysql -h"$DB_HOST" -P"$DB_PORT" -u"$DB_USER" -p"$DB_PASS" "$DB_NAME" < "$SRC/install/schema.sql"
+  # 连接测试
+  if ! "${MYSQL_EXEC[@]}" -u"$DB_USER" -p"$DB_PASS" -e "USE \`${DB_NAME}\`;" >/dev/null 2>&1; then
+    err "数据库连接失败。请确认 1Panel 已建好库/用户，且用户名密码正确。"
+    exit 1
+  fi
+  "${MYSQL_EXEC[@]}" -u"$DB_USER" -p"$DB_PASS" "$DB_NAME" < "$SRC/install/schema.sql"
   ok "表结构已导入到 ${DB_NAME}"
 
   APP_KEY="$(openssl rand -hex 24 2>/dev/null || head -c 24 /dev/urandom | od -An -tx1 | tr -d ' \n')"
+  DB_HOST_ESC="${DB_HOST//\\/\\\\}"; DB_HOST_ESC="${DB_HOST_ESC//\'/\\\'}"
   cat > "${SITE_DIR}/config.php" <<PHP
 <?php
 return [
@@ -118,7 +141,7 @@ return [
     'site_url' => '${SITE_URL}',
     'timezone' => 'Asia/Shanghai',
     'db' => [
-        'host' => '${DB_HOST}', 'port' => ${DB_PORT},
+        'host' => '${DB_HOST_ESC}', 'port' => ${DB_PORT},
         'name' => '${DB_NAME}', 'user' => '${DB_USER}', 'pass' => '${DB_PASS}',
         'charset' => 'utf8mb4',
     ],
@@ -131,10 +154,15 @@ return [
 PHP
   ok "config.php 已写入"
 
-  HASH="$(php -r 'echo password_hash($argv[1], PASSWORD_DEFAULT);' "$ADMIN_PASS")"
-  mysql -h"$DB_HOST" -P"$DB_PORT" -u"$DB_USER" -p"$DB_PASS" "$DB_NAME" \
+  HASH="$("${PHP_EXEC[@]}" -r 'echo password_hash($argv[1], PASSWORD_DEFAULT);' "$ADMIN_PASS")"
+  "${MYSQL_EXEC[@]}" -u"$DB_USER" -p"$DB_PASS" "$DB_NAME" \
     -e "INSERT INTO admins (username,password_hash,nickname,role,status,created_at) VALUES ('${ADMIN_USER}','${HASH}','超级管理员','super',1,NOW());"
   ok "管理员账号已创建"
+
+  # 从 PHP 运行侧验证数据库可达（最能反映面板实际能否连上）
+  c "==> 验证面板侧数据库连接"
+  CHK="$("${PHP_EXEC[@]}" -r 'try{ new PDO("mysql:host=".$argv[1].";port=".$argv[2].";dbname=".$argv[3], $argv[4], $argv[5]); echo "OK"; }catch(Throwable $e){ echo "ERR: ".$e->getMessage(); }' "$DB_HOST" "$DB_PORT" "$DB_NAME" "$DB_USER" "$DB_PASS" 2>&1 || true)"
+  if [ "$CHK" = "OK" ]; then ok "PHP 侧连接数据库成功（host=${DB_HOST}）"; else warn "PHP 侧连接数据库失败：${CHK}"; warn "请把 config.php 里的 db.host 改成 1Panel 提示的连接地址（常见为 mysql 容器名或 127.0.0.1）。"; fi
 fi
 
 # 归属与站点目录保持一致
