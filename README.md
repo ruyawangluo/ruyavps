@@ -38,7 +38,11 @@
    }
    ```
 3. 部署代码：把 `master/` 目录内容放到站点根；同时把 `agent/` 复制为站点下的 `agent-src/`，把 `install/agent-install.sh` 复制为站点下的 `agent-install.sh`（供被控端远程安装分发）。
-4. 浏览器访问站点根，未安装自动跳 `/install.php`，填数据库与管理员完成安装。
+4. 在服务器上运行安装脚本（会部署代码、建库导入、写 config.php、建管理员）：
+   ```bash
+   bash install/install-master.sh
+   ```
+   按提示填站点目录（默认 `/opt/1panel/www/sites/ruyavps/index`）、数据库、站点地址、管理员账号密码。
 
 ### 2. 节点端（在每台计算节点上，root）
 
@@ -80,12 +84,13 @@ curl -fsSL http://<面板地址>/deploy/agent.sh | sudo bash
 ```
 .
 ├── install/
-│   ├── schema.sql              # 面板数据库结构（面板自己的数据）
+│   ├── install-master.sh       # 面板端安装/升级脚本（1Panel）
+│   ├── schema.sql              # 面板数据库结构
 │   ├── agent-install.sh        # 节点端安装脚本（由 /deploy/agent.sh 下发）
 │   └── nginx.conf.sample
 ├── master/                     # 面板端
 │   ├── config.sample.php
-│   ├── public/                 # Web 根目录（index.php / install.php / router.php）
+│   ├── public/                 # Web 根目录（index.php / router.php / assets）
 │   ├── app/
 │   │   ├── Core/               # Db/NodeClient/NodeStore…/OpenAuth/InstanceAuth/Setting/Tar/Version
 │   │   ├── Services/           # NodeService（节点注册表）/ InstanceService（索引+转发）
@@ -118,7 +123,7 @@ curl -fsSL http://<面板地址>/deploy/agent.sh | sudo bash
 | 用户 | 增删、启停、按邮箱管理，实例数统计 |
 | 操作日志 | 管理员/用户/API 审计 |
 | 系统设置 | 站点、开放 API 凭据 |
-| 关于与更新 | 面板版本、节点版本、上传更新包（保留 config.php） |
+| 关于 | 面板版本、节点版本、升级方式（脚本） |
 
 用户面板：登录、实例列表/详情、开关机、重置密码、快照、删除、查看访问 Key。
 
@@ -172,5 +177,5 @@ curl -fsSL http://<面板地址>/deploy/agent.sh | sudo bash
 
 - 面板端：`master/app/Core/Version.php`（`MASTER`）。
 - 节点端：`agent/lib/Version.php`（`VERSION`）；面板「关于与更新」展示各节点上报版本。
-- 升级面板：上传 `.tar.gz` 更新包（保留 config.php）。
+- 升级面板：在服务器上运行 `bash install/install-master.sh update`（覆盖程序、保留 config.php）。
 - 升级节点：在节点上重新执行安装命令。
