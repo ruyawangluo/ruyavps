@@ -69,13 +69,21 @@ BODY="Incus 云控制台 $TAG
 RESP="$(curl -s -X POST -H "Authorization: token $TOKEN" -H "Accept: application/vnd.github+json" \
   "https://api.github.com/repos/$REPO/releases" \
   -d "$(python3 -c "import json,sys;print(json.dumps({'tag_name':sys.argv[1],'target_commitish':sys.argv[2],'name':'Incus 云控制台 '+sys.argv[1],'body':sys.argv[3]},ensure_ascii=False))" "$TAG" "$BRANCH" "$BODY")")"
-RID="$(printf '%s' "$RESP" | python3 -c "import json,sys;print(json.load(sys.stdin).get('id',''))")"
-[ -n "$RID" ] || { echo "创建 Release 失败：$RESP"; exit 1; }
-echo "==> Release 创建成功：https://github.com/$REPO/releases/tag/$TAG"
+RID="$(printf '%s' "$RESP" | python3 -c "import json,sys;print(json.load(sys.stdin).get('id',''))" 2>/dev/null || true)"
+if [ -z "$RID" ]; then
+  # tag 可能已存在：复用已有 release
+  RID="$(curl -s -H "Authorization: token $TOKEN" "https://api.github.com/repos/$REPO/releases/tags/$TAG" \
+    | python3 -c "import json,sys;print(json.load(sys.stdin).get('id',''))" 2>/dev/null || true)"
+fi
+[ -n "$RID" ] || { echo "创建/获取 Release 失败：$RESP"; exit 1; }
+echo "==> Release：https://github.com/$REPO/releases/tag/$TAG （id=$RID）"
 
-# ---- 上传资产 ----
+# ---- 上传资产（已存在则跳过） ----
+EXIST="$(curl -s -H "Authorization: token $TOKEN" "https://api.github.com/repos/$REPO/releases/$RID/assets" \
+  | python3 -c "import json,sys;print(' '.join(a['name'] for a in json.load(sys.stdin)))" 2>/dev/null || true)"
 for f in "$A" "$B"; do
   name="$(basename "$f")"
+  case " $EXIST " in *" $name "*) echo "  已存在，跳过: $name"; continue ;; esac
   curl -s -X POST -H "Authorization: token $TOKEN" -H "Content-Type: application/gzip" \
     --data-binary @"$f" "https://uploads.github.com/repos/$REPO/releases/$RID/assets?name=$name" \
     | python3 -c "import json,sys;d=json.load(sys.stdin);print('  上传:', d.get('name'), d.get('state') or d.get('message'))"
