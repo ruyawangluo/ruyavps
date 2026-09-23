@@ -180,3 +180,15 @@ curl -fsSL https://raw.githubusercontent.com/ruyawangluo/ruyavps/main/install/ag
 - 节点端：`agent/lib/Version.php`（`VERSION`）；面板「关于与更新」展示各节点上报版本。
 - 升级面板：在服务器上运行 `bash install/install-master.sh update`（覆盖程序、保留 config.php）。
 - 升级节点：在节点上重新执行安装命令。
+
+## 发行版（Releases）
+
+程序包发布在 GitHub 发行版：https://github.com/ruyawangluo/ruyavps/releases
+
+一键打包并发布（需 `GITHUB_TOKEN` 或已配置 git 凭据）：
+
+```bash
+bash scripts/release.sh
+```
+
+会读取 `master/app/Core/Version.php` 的版本号 → 打包面板端/节点端 → 创建同名 Release(Tag) 并上传两个包。
