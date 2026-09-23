@@ -1,0 +1,35 @@
+# ============================================================================
+#  Nginx 站点配置示例（主控端）
+#
+#  手动部署时把它放进 /etc/nginx/conf.d/ 或 sites-available/，修改：
+#    - server_name
+#    - root 指向 master/public 的绝对路径
+#    - fastcgi_pass 与 PHP-FPM 版本（php8.3-fpm.sock 等）
+#
+#  关键点：location / { try_files $uri $uri/ /index.php?$query_string; }
+#  没有这条伪静态规则时，/admin、/user 等无扩展名地址会 404。
+#  （安装入口 /install.php 是物理文件，不依赖伪静态也能访问。）
+# ============================================================================
+server {
+    listen 80;
+    server_name panel.example.com;
+    root /var/www/incus-panel/public;
+    index index.php;
+
+    # 伪静态：不存在的路径交给 index.php
+    location / {
+        try_files $uri $uri/ /index.php?$query_string;
+    }
+
+    # PHP-FPM
+    location ~ \.php$ {
+        include snippets/fastcgi-php.conf;
+        fastcgi_pass unix:/run/php/php8.3-fpm.sock;
+    }
+
+    # 禁止访问隐藏文件与敏感文件
+    location ~ /\. { deny all; }
+    location ~ ^/.*\.(sql|log)$ { deny all; }
+
+    client_max_body_size 64m;
+}

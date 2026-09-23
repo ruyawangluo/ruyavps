@@ -1,0 +1,19 @@
+# Apache 伪静态规则。将站点根目录指向 master/public 时生效。
+# 需确保 Apache 开启了 mod_rewrite，且站点目录允许 AllowOverride All。
+<IfModule mod_rewrite.c>
+    RewriteEngine On
+    RewriteBase /
+
+    # 已存在的文件/目录直接返回（含 install.php、assets 等）
+    RewriteCond %{REQUEST_FILENAME} -f [OR]
+    RewriteCond %{REQUEST_FILENAME} -d
+    RewriteRule ^ - [L]
+
+    # 其余请求统一交给 index.php
+    RewriteRule ^ index.php [QSA,L]
+</IfModule>
+
+# 禁止访问敏感文件
+<FilesMatch "\.(config\.php)$">
+    Require all denied
+</FilesMatch>

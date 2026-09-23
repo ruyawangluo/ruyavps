@@ -1,0 +1,17 @@
+[Unit]
+Description=Incus Node API (节点端：被控程序 + 本地库)
+After=network-online.target incus.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+WorkingDirectory=/opt/incus-node
+ExecStart=/usr/bin/php -S 0.0.0.0:8787 /opt/incus-node/server.php
+Restart=always
+RestartSec=5
+User=root
+StandardOutput=append:/var/log/incus-node.log
+StandardError=append:/var/log/incus-node.log
+
+[Install]
+WantedBy=multi-user.target
